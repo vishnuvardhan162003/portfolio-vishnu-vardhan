@@ -1,0 +1,53 @@
+services:
+  backend:
+    build: ./eduzyra-backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./eduzyra-backend/.env
+    depends_on:
+      - mongo
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000}
+        VITE_CHATBOT_API_URL: ${VITE_CHATBOT_API_URL:-http://localhost:8000}
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+      - chatbot-backend
+    restart: unless-stopped
+
+  # ---- AI Chatbot (EduBot) — added, does not affect any service above ----
+  chatbot-backend:
+    build: ./eduzyra-chatbot-backend
+    container_name: eduzyra-chatbot-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - ADMIN_API_KEY=${ADMIN_API_KEY:-edubot-admin-key-change-me}
+      - DATABASE_URL=sqlite:///data/chatbot.db
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+      - RAG_SIMILARITY_THRESHOLD=0.35
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+    volumes:
+      - chatbot_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
+  chatbot_data:
